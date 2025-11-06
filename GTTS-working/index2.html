@@ -1,0 +1,199 @@
+<!-- Second html file -->
+<!--Mic and audio need to fix , response working properly-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sam Voice Bot!</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f6f7fb;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    #messages {
+      background: white;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 1rem;
+      height: 300px;
+      overflow-y: auto;
+    }
+    .user { color: #0066cc; }
+    .bot { color: #009933; }
+    button {
+      margin-top: 1rem;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h1>Sam Voice Bot Demo.</h1>
+  <div id="messages"></div>
+  
+  <button id="startBtn">🎙️ Start Speaking</button>
+  <button id="stopBtn" disabled>🛑 Stop</button>
+  
+  <script>
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const messagesDiv = document.getElementById("messages");
+    
+    const ws = new WebSocket("ws://localhost:9900/ws");
+    let micActive = false;
+    let mediaRecorder;
+    let audioPlayer;
+    
+    ws.onopen = () => {
+      console.log("✅ Connected to backend.");
+      addMessage("System", "Connected to voice bot server.");
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.pause) {
+        addMessage("System", "AI speech paused.");
+        stopAudioPlayback();  
+        // stopMessage("System", "AI Speech Paused.");
+        // if (!audioPlayer.paused) {
+        //   audioPlayer.pause();
+        //   audioPlayer.currentTime = 0;
+        // }
+        return;
+      }
+
+      if (data.text) addMessage("AI", data.text);
+
+      if (data.audio) {
+        const audioSrc = "data:audio/mp3;base64," + data.audio;
+        playAIAudio(audioSrc);
+        // audioPlayer.src = audioSrc;
+        // audioPlayer.play().catch(err => console.error("Audio play failed", err));
+      }
+    };
+
+    // ws.onclose = () => addMessage("System", "Dissconnected from Backend.");
+    // {
+    //   // addMessage("System", "Disconnected from backend.");
+    // };
+
+    function addMessage(sender, text) {
+      const div = document.createElement("div");
+      div.className = sender === "AI" ? "bot" : "user";
+      div.innerText = `${sender}: ${text}`;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    function stopAudioPlayback() {
+      if (!audioPlayer.paused) {
+        audioplayer.pause();
+        audioPlayer.currentTime = 0;
+      }
+    }
+
+    function playAiAudio(audioSrc){
+      micActive = flase;
+      recognition.stop();
+
+      audioPlayer.src = audioSrc;
+      audioPlayer.type = "audio/mpeg";
+      audioPlayer.play().then(()=> {
+        addMessage("System", "AI is speaking....");
+      }).catch(err => console.warn("Audio play falied", err));
+
+      audioPlayer.onened = () => {
+        addMessage("System", "AI finished speaking, Listening again....");
+        startRecognition();
+      };
+    }
+
+    // Simple browser SpeechRecognition for user input
+    // let recognition;
+    if ("webkitSpeechRecognition" in window) {
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        addMessage("System", "Listening...");
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        micActive =  true;
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        addMessage("You", transcript);
+        if (transcript){
+        ws.send(transcript);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.warn("Speech recognition error:", event.error);
+        // if (event.error === "no-speech" && micActive) {
+        //   setTimeout(() => startRecognition(), 1000);
+        // }
+      };
+
+      recognition.onend = () => {
+        if (micActive){
+          console.log("Restarting mic....");
+          setTimeout(()=> {
+            try{
+              recognition.start();
+            }catch(err){
+              console.log("Mic restart issue: ",err);
+            }
+          }, 500);
+          //startRecognition();
+        }
+        // startBtn.disabled = false;
+        // stopBtn.disabled = true;
+        // addMessage("System", "Stopped listening.");
+      };
+    } else {
+      alert("Speech recognition not supported in this browser. Try Chrome.");
+    }
+
+    function startRecognition(){
+      if (!micActive) micActive = true;
+      try {
+        recognition.start();
+      } catch (err) {
+        console.log("Recognition already active");
+      }
+    }
+
+    function stopRecognition() {
+      micActive = false;
+      recognition.stop();
+      stopAudioPlayback();
+    }
+    
+    
+    startBtn.onclick = () => {
+      audioPlayer = new Audio();
+      startRecognition();
+  }
+  //  recognition.start();
+    stopBtn.onclick = () => recognition.stop();
+  </script>
+</body>
+</html>
